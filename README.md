@@ -94,7 +94,8 @@ make eval       # Run evaluation
 
 ## Documentation
 
-- [Technical Architecture](docs/technical-architecture.md) - **Deep-dive for engineers** (LLM integration, pipeline design, prompt engineering)
+- [Learning Path](docs/learning-path.md) - **Start here!** Structured guide to learn AI/ML engineering from this codebase
+- [Technical Architecture](docs/technical-architecture.md) - Deep-dive for engineers (LLM integration, pipeline design, prompt engineering)
 - [Spec](docs/spec.md) - Product specification
 - [Implementation Plan](docs/implementation-plan.md) - Build checklist
 - [Evaluation](docs/eval.md) - Quality gates
