@@ -1,0 +1,48 @@
+UNITED HEALTHCARE
+P.O. Box 740800
+Atlanta, GA 30374
+
+February 1, 2024
+
+Jane Doe
+456 Oak Avenue
+Atlanta, GA 30301
+
+Member ID: UHC987654321
+Claim Number: CLM2024020100002
+
+RE: Claim Denial Notice
+
+Dear Jane Doe,
+
+This letter is regarding your claim for Humira (adalimumab) injection
+prescribed by Dr. Robert Johnson for treatment of rheumatoid arthritis.
+Date of service: January 20, 2024.
+
+DENIAL DETERMINATION
+
+After medical review, we have determined that this service does not meet
+the criteria for medical necessity under your plan. The documentation
+provided does not demonstrate that conventional DMARD therapy was tried
+and failed before initiating biologic therapy.
+
+ICD-10 Code: M05.79 (Rheumatoid arthritis)
+CPT Code: J0135
+
+Amount Billed: $6,500.00
+Your Responsibility: $6,500.00
+
+APPEAL INFORMATION
+
+You may appeal this decision within 60 days. Include:
+- Medical records showing treatment history
+- Letter of medical necessity from your physician
+- Documentation of prior treatments tried
+
+Appeals Address: UHC Appeals, P.O. Box 740800, Atlanta, GA 30374
+Appeals Phone: (800) 555-9876
+Appeals Fax: (800) 555-6789
+
+Sincerely,
+Medical Review Department
+United Healthcare

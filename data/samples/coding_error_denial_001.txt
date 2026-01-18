@@ -1,0 +1,55 @@
+AETNA
+P.O. Box 981106
+El Paso, TX 79998
+
+March 10, 2024
+
+Michael Johnson
+789 Pine Street
+Houston, TX 77001
+
+Member ID: W123456789
+Group Number: 001234
+Claim Number: AET2024031000123
+
+RE: Claim Processing Notification
+
+Dear Michael Johnson,
+
+We have processed your claim for services received on February 28, 2024,
+from Houston Orthopedic Associates.
+
+CLAIM STATUS: DENIED
+
+Reason for Denial: The claim was submitted with an invalid modifier
+combination. CPT code 29881 (knee arthroscopy) was billed with modifier 59,
+but the documentation does not support a distinct procedural service.
+
+The claim also shows a possible NPI mismatch. The billing NPI does not
+match our records for the rendering provider.
+
+Service Details:
+- CPT Code: 29881
+- Modifier: 59
+- Provider: Dr. Sarah Chen
+- Date of Service: 02/28/2024
+
+Amounts:
+- Billed Amount: $4,200.00
+- Allowed Amount: $0.00
+- Member Responsibility: $4,200.00
+
+NEXT STEPS
+
+Please contact your provider's billing department to:
+1. Review and correct the modifier usage
+2. Verify the correct NPI is on file
+3. Resubmit the corrected claim
+
+Timely Filing: Corrected claims must be submitted within 90 days of this notice.
+
+Questions? Call Member Services: (800) 555-2222
+
+Sincerely,
+Claims Processing Department
+Aetna

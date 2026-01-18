@@ -1,0 +1,51 @@
+BLUE CROSS BLUE SHIELD OF NORTH CAROLINA
+P.O. Box 2291
+Durham, NC 27702
+
+January 15, 2024
+
+John Smith
+123 Main Street
+Raleigh, NC 27601
+
+Member ID: ABC123456789
+Group Number: 98765
+Claim Number: CLM2024011500001
+
+RE: Explanation of Benefits - Claim Denial
+
+Dear John Smith,
+
+We have reviewed your claim for MRI of the lumbar spine (CPT code 72148)
+performed on January 5, 2024, by Dr. Jane Wilson at Raleigh Medical Center.
+
+YOUR CLAIM HAS BEEN DENIED
+
+Reason for Denial: Prior authorization was not obtained for this service.
+According to your plan benefits, MRI services require prior authorization
+before the service is performed.
+
+Denial Code: CO-197
+
+Amount Billed: $2,500.00
+Amount Allowed: $0.00
+Patient Responsibility: $2,500.00
+
+YOUR APPEAL RIGHTS
+
+You have the right to appeal this decision. To file an appeal, you must
+submit your request within 180 days of this notice.
+
+To file an appeal:
+Phone: (800) 555-1234
+Fax: (800) 555-4321
+Mail: BCBS Appeals Department, P.O. Box 2291, Durham, NC 27702
+
+Please include:
+- A copy of this denial letter
+- A letter explaining why you believe the claim should be paid
+- Any supporting documentation
+
+Sincerely,
+Claims Department
+Blue Cross Blue Shield of North Carolina

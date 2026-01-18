@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://denialops.dev/schemas/case_facts.schema.json",
+  "title": "CaseFacts",
+  "description": "Structured extraction from a denial letter",
+  "type": "object",
+  "required": ["case_id", "extraction_timestamp", "denial_reason"],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this case"
+    },
+    "extraction_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When extraction was performed"
+    },
+    "source_document": {
+      "type": "string",
+      "description": "Filename of the source denial letter"
+    },
+    "denial_reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Primary denial reason as stated in the letter"
+    },
+    "denial_reason_summary": {
+      "type": "string",
+      "description": "Plain-language summary of why the claim was denied"
+    },
+    "denial_codes": {
+      "type": "array",
+      "description": "All codes mentioned in the denial",
+      "items": {
+        "type": "object",
+        "required": ["code", "code_type"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The code value"
+          },
+          "code_type": {
+            "type": "string",
+            "enum": ["CPT", "HCPCS", "ICD-10-CM", "ICD-10-PCS", "CARC", "RARC", "internal", "unknown"],
+            "description": "Type of code"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description if provided"
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "description": "Information about the denied service",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Service or procedure description"
+        },
+        "cpt_codes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "CPT/HCPCS codes for the service"
+        },
+        "diagnosis_codes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "ICD-10 diagnosis codes"
+        },
+        "date_of_service": {
+          "type": "string",
+          "format": "date",
+          "description": "Date service was provided (YYYY-MM-DD)"
+        },
+        "provider_name": {
+          "type": "string",
+          "description": "Name of the provider"
+        },
+        "provider_npi": {
+          "type": "string",
+          "pattern": "^[0-9]{10}$",
+          "description": "Provider NPI (10 digits)"
+        },
+        "facility_name": {
+          "type": "string",
+          "description": "Facility where service was provided"
+        }
+      }
+    },
+    "payer": {
+      "type": "object",
+      "description": "Insurance payer information",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Payer/insurance company name"
+        },
+        "plan_name": {
+          "type": "string",
+          "description": "Specific plan name if identifiable"
+        },
+        "plan_type": {
+          "type": "string",
+          "enum": ["HMO", "PPO", "EPO", "POS", "HDHP", "Medicare", "Medicaid", "unknown"],
+          "description": "Type of insurance plan"
+        },
+        "member_id": {
+          "type": "string",
+          "description": "Member/subscriber ID"
+        },
+        "group_number": {
+          "type": "string",
+          "description": "Group number"
+        },
+        "claim_number": {
+          "type": "string",
+          "description": "Claim reference number"
+        }
+      }
+    },
+    "dates": {
+      "type": "object",
+      "description": "Key dates from the denial",
+      "properties": {
+        "date_of_service": {
+          "type": "string",
+          "format": "date"
+        },
+        "date_of_denial": {
+          "type": "string",
+          "format": "date",
+          "description": "Date the denial letter was issued"
+        },
+        "appeal_deadline": {
+          "type": "string",
+          "format": "date",
+          "description": "Deadline to file appeal"
+        },
+        "appeal_deadline_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days from denial to appeal deadline"
+        },
+        "timely_filing_deadline": {
+          "type": "string",
+          "format": "date",
+          "description": "Deadline for timely filing if applicable"
+        }
+      }
+    },
+    "amounts": {
+      "type": "object",
+      "description": "Financial amounts from the denial/EOB",
+      "properties": {
+        "billed_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Amount billed by provider"
+        },
+        "allowed_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Amount allowed by payer"
+        },
+        "paid_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Amount paid by payer"
+        },
+        "patient_responsibility": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Amount patient owes"
+        },
+        "deductible_applied": {
+          "type": "number",
+          "minimum": 0
+        },
+        "coinsurance_applied": {
+          "type": "number",
+          "minimum": 0
+        },
+        "copay_applied": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "contact_info": {
+      "type": "object",
+      "description": "Payer contact information for appeals",
+      "properties": {
+        "phone": {
+          "type": "string",
+          "description": "Phone number for appeals"
+        },
+        "fax": {
+          "type": "string",
+          "description": "Fax number for appeals"
+        },
+        "address": {
+          "type": "string",
+          "description": "Mailing address for appeals"
+        },
+        "website": {
+          "type": "string",
+          "format": "uri",
+          "description": "Website for appeals"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    },
+    "prior_authorization": {
+      "type": "object",
+      "description": "Prior authorization details if mentioned",
+      "properties": {
+        "was_required": {
+          "type": "boolean",
+          "description": "Whether PA was required"
+        },
+        "was_obtained": {
+          "type": "boolean",
+          "description": "Whether PA was obtained"
+        },
+        "auth_number": {
+          "type": "string",
+          "description": "PA number if provided"
+        },
+        "denial_reason": {
+          "type": "string",
+          "description": "Reason PA was denied or not valid"
+        }
+      }
+    },
+    "extraction_confidence": {
+      "type": "object",
+      "description": "Confidence scores for extracted fields",
+      "properties": {
+        "overall": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Overall extraction confidence"
+        },
+        "denial_reason": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "dates": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "amounts": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "codes": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "missing_info": {
+      "type": "array",
+      "description": "Information that could not be extracted",
+      "items": {
+        "type": "object",
+        "required": ["field", "reason"],
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Name of the missing field"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why it could not be extracted"
+          }
+        }
+      }
+    },
+    "raw_text_snippets": {
+      "type": "object",
+      "description": "Key text excerpts for citation/grounding",
+      "properties": {
+        "denial_statement": {
+          "type": "string",
+          "description": "Exact text of denial reason"
+        },
+        "appeal_instructions": {
+          "type": "string",
+          "description": "Appeal instructions as stated"
+        }
+      }
+    }
+  }
+}

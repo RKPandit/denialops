@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://denialops.dev/schemas/route.schema.json",
+  "title": "Route",
+  "description": "Routing decision for a denial case",
+  "type": "object",
+  "required": ["case_id", "route", "confidence", "reasoning", "timestamp"],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Case this routing applies to"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When routing decision was made"
+    },
+    "route": {
+      "type": "string",
+      "enum": [
+        "prior_auth_needed",
+        "claim_correction_resubmit",
+        "medical_necessity_appeal"
+      ],
+      "description": "Selected action route"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confidence in the routing decision (0-1)"
+    },
+    "reasoning": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Explanation of why this route was selected"
+    },
+    "signals": {
+      "type": "array",
+      "description": "Signals that contributed to the routing decision",
+      "items": {
+        "type": "object",
+        "required": ["signal", "weight", "source"],
+        "properties": {
+          "signal": {
+            "type": "string",
+            "description": "The signal detected (e.g., 'prior_auth_mentioned')"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1,
+            "description": "How strongly this signal influenced the decision"
+          },
+          "source": {
+            "type": "string",
+            "description": "Where this signal was found (e.g., 'denial_reason', 'denial_codes')"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Text or code that triggered this signal"
+          }
+        }
+      }
+    },
+    "alternative_routes": {
+      "type": "array",
+      "description": "Other routes considered with their scores",
+      "items": {
+        "type": "object",
+        "required": ["route", "confidence"],
+        "properties": {
+          "route": {
+            "type": "string",
+            "enum": [
+              "prior_auth_needed",
+              "claim_correction_resubmit",
+              "medical_necessity_appeal"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reason_not_selected": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "requires_verified_mode": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this route would benefit significantly from Verified mode"
+    },
+    "urgency": {
+      "type": "string",
+      "enum": ["standard", "expedited", "urgent"],
+      "default": "standard",
+      "description": "Recommended urgency level"
+    },
+    "urgency_reason": {
+      "type": "string",
+      "description": "Why a non-standard urgency was assigned"
+    }
+  }
+}

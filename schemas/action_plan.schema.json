@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://denialops.dev/schemas/action_plan.schema.json",
+  "title": "ActionPlan",
+  "description": "Generated action plan for resolving a denial",
+  "type": "object",
+  "required": ["case_id", "route", "summary", "steps", "generated_at"],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "route": {
+      "type": "string",
+      "enum": [
+        "prior_auth_needed",
+        "claim_correction_resubmit",
+        "medical_necessity_appeal"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["fast", "verified"],
+      "description": "Mode used to generate this plan"
+    },
+    "summary": {
+      "type": "object",
+      "required": ["situation", "recommendation"],
+      "properties": {
+        "situation": {
+          "type": "string",
+          "description": "Plain-language explanation of denial"
+        },
+        "recommendation": {
+          "type": "string",
+          "description": "High-level recommended action"
+        },
+        "success_likelihood": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "unknown"],
+          "description": "Estimated likelihood of successful resolution"
+        },
+        "success_factors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Factors that would increase success"
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered steps to resolve the denial",
+      "items": {
+        "type": "object",
+        "required": ["step_number", "action", "description"],
+        "properties": {
+          "step_number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "action": {
+            "type": "string",
+            "description": "Brief action title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed instructions"
+          },
+          "responsible_party": {
+            "type": "string",
+            "enum": ["patient", "provider", "billing_staff", "clinician"],
+            "description": "Who should take this action"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date",
+            "description": "Recommended completion date"
+          },
+          "deadline_source": {
+            "type": "string",
+            "description": "Where the deadline came from (e.g., 'appeal_deadline minus 5 days')"
+          },
+          "documents_needed": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Documents required for this step"
+          },
+          "templates_available": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Generated templates that help with this step"
+          }
+        }
+      }
+    },
+    "timeline": {
+      "type": "object",
+      "description": "Key dates and deadlines",
+      "properties": {
+        "appeal_deadline": {
+          "type": "string",
+          "format": "date"
+        },
+        "days_remaining": {
+          "type": "integer",
+          "description": "Days until appeal deadline"
+        },
+        "recommended_submission_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Recommended date to submit appeal/correction"
+        },
+        "expected_response_time": {
+          "type": "string",
+          "description": "Typical response time (e.g., '30-45 days')"
+        }
+      }
+    },
+    "evidence_checklist": {
+      "type": "array",
+      "description": "Evidence to gather for the appeal/correction",
+      "items": {
+        "type": "object",
+        "required": ["item", "priority"],
+        "properties": {
+          "item": {
+            "type": "string",
+            "description": "Evidence item description"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["required", "recommended", "optional"]
+          },
+          "source": {
+            "type": "string",
+            "description": "Where to obtain this evidence"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Why this evidence helps"
+          }
+        }
+      }
+    },
+    "missing_info_requests": {
+      "type": "array",
+      "description": "Information needed from user to improve the plan",
+      "items": {
+        "type": "object",
+        "required": ["question", "field"],
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "Question to ask the user"
+          },
+          "field": {
+            "type": "string",
+            "description": "Which case_facts field this would populate"
+          },
+          "importance": {
+            "type": "string",
+            "enum": ["critical", "helpful", "nice_to_have"]
+          }
+        }
+      }
+    },
+    "generated_documents": {
+      "type": "array",
+      "description": "Documents generated as part of this plan",
+      "items": {
+        "type": "object",
+        "required": ["filename", "document_type"],
+        "properties": {
+          "filename": {
+            "type": "string"
+          },
+          "document_type": {
+            "type": "string",
+            "enum": [
+              "appeal_letter",
+              "reconsideration_request",
+              "pa_checklist",
+              "resubmit_checklist",
+              "call_script",
+              "clinician_letter",
+              "fax_cover"
+            ]
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "citations": {
+      "type": "array",
+      "description": "Policy citations (Verified mode only)",
+      "items": {
+        "type": "object",
+        "required": ["claim", "source"],
+        "properties": {
+          "claim": {
+            "type": "string",
+            "description": "The claim being made"
+          },
+          "source": {
+            "type": "string",
+            "description": "Document and section (e.g., 'SBC page 5, Prior Authorization section')"
+          },
+          "quote": {
+            "type": "string",
+            "description": "Direct quote if available"
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Assumptions made due to missing information",
+      "items": {
+        "type": "object",
+        "required": ["assumption", "impact"],
+        "properties": {
+          "assumption": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "string",
+            "description": "How this assumption affects the plan"
+          },
+          "how_to_verify": {
+            "type": "string",
+            "description": "How user can verify/correct this assumption"
+          }
+        }
+      }
+    },
+    "disclaimers": {
+      "type": "array",
+      "description": "Required disclaimers",
+      "items": { "type": "string" },
+      "default": [
+        "This is not legal advice. Consult an attorney for legal questions.",
+        "This is not medical advice. Consult your healthcare provider for medical questions.",
+        "Plan-specific coverage details may vary. Verify with your insurance company."
+      ]
+    }
+  }
+}

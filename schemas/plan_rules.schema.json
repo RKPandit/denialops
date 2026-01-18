@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://denialops.dev/schemas/plan_rules.schema.json",
+  "title": "PlanRules",
+  "description": "Extracted rules from SBC/EOC documents (Verified mode)",
+  "type": "object",
+  "required": ["case_id", "source_document", "extracted_at", "plan_info"],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "source_document": {
+      "type": "string",
+      "description": "Filename of source SBC/EOC"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": ["SBC", "EOC", "COC", "SPD", "other"],
+      "description": "Type of plan document"
+    },
+    "extracted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "plan_info": {
+      "type": "object",
+      "description": "Basic plan identification",
+      "properties": {
+        "plan_name": {
+          "type": "string"
+        },
+        "plan_year": {
+          "type": "string",
+          "pattern": "^[0-9]{4}$",
+          "description": "Plan year (YYYY)"
+        },
+        "payer_name": {
+          "type": "string"
+        },
+        "plan_type": {
+          "type": "string",
+          "enum": ["HMO", "PPO", "EPO", "POS", "HDHP", "Medicare", "Medicaid", "other"]
+        },
+        "state": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "State (2-letter code)"
+        },
+        "effective_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "termination_date": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "deductibles": {
+      "type": "object",
+      "properties": {
+        "individual_in_network": {
+          "type": "number",
+          "minimum": 0
+        },
+        "individual_out_of_network": {
+          "type": "number",
+          "minimum": 0
+        },
+        "family_in_network": {
+          "type": "number",
+          "minimum": 0
+        },
+        "family_out_of_network": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source_page": {
+          "type": "integer",
+          "description": "Page number in source document"
+        }
+      }
+    },
+    "out_of_pocket_max": {
+      "type": "object",
+      "properties": {
+        "individual_in_network": {
+          "type": "number",
+          "minimum": 0
+        },
+        "individual_out_of_network": {
+          "type": "number",
+          "minimum": 0
+        },
+        "family_in_network": {
+          "type": "number",
+          "minimum": 0
+        },
+        "family_out_of_network": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source_page": {
+          "type": "integer"
+        }
+      }
+    },
+    "prior_authorization_rules": {
+      "type": "array",
+      "description": "Services requiring prior authorization",
+      "items": {
+        "type": "object",
+        "required": ["service_category", "pa_required"],
+        "properties": {
+          "service_category": {
+            "type": "string",
+            "description": "Category of service (e.g., 'Imaging', 'Surgery', 'DME')"
+          },
+          "pa_required": {
+            "type": "boolean"
+          },
+          "conditions": {
+            "type": "string",
+            "description": "Conditions under which PA is required"
+          },
+          "source_page": {
+            "type": "integer"
+          },
+          "source_section": {
+            "type": "string"
+          },
+          "source_quote": {
+            "type": "string",
+            "description": "Direct quote from document"
+          }
+        }
+      }
+    },
+    "medical_necessity_criteria": {
+      "type": "array",
+      "description": "Medical necessity definitions and criteria",
+      "items": {
+        "type": "object",
+        "properties": {
+          "definition": {
+            "type": "string",
+            "description": "How plan defines medical necessity"
+          },
+          "criteria": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Specific criteria that must be met"
+          },
+          "source_page": {
+            "type": "integer"
+          },
+          "source_section": {
+            "type": "string"
+          },
+          "source_quote": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "description": "Services excluded from coverage",
+      "items": {
+        "type": "object",
+        "required": ["exclusion"],
+        "properties": {
+          "exclusion": {
+            "type": "string",
+            "description": "What is excluded"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category (e.g., 'cosmetic', 'experimental')"
+          },
+          "exceptions": {
+            "type": "string",
+            "description": "Any exceptions to the exclusion"
+          },
+          "source_page": {
+            "type": "integer"
+          },
+          "source_section": {
+            "type": "string"
+          },
+          "source_quote": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "appeal_rights": {
+      "type": "object",
+      "description": "Appeal process details",
+      "properties": {
+        "internal_appeal_levels": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of internal appeal levels"
+        },
+        "internal_appeal_deadline_days": {
+          "type": "integer",
+          "description": "Days to file internal appeal"
+        },
+        "expedited_appeal_available": {
+          "type": "boolean"
+        },
+        "expedited_criteria": {
+          "type": "string",
+          "description": "When expedited appeal is available"
+        },
+        "external_review_available": {
+          "type": "boolean"
+        },
+        "external_review_deadline_days": {
+          "type": "integer"
+        },
+        "appeal_address": {
+          "type": "string"
+        },
+        "appeal_phone": {
+          "type": "string"
+        },
+        "appeal_fax": {
+          "type": "string"
+        },
+        "source_page": {
+          "type": "integer"
+        },
+        "source_section": {
+          "type": "string"
+        }
+      }
+    },
+    "timely_filing": {
+      "type": "object",
+      "description": "Timely filing requirements",
+      "properties": {
+        "initial_claim_days": {
+          "type": "integer",
+          "description": "Days to file initial claim"
+        },
+        "corrected_claim_days": {
+          "type": "integer",
+          "description": "Days to file corrected claim"
+        },
+        "source_page": {
+          "type": "integer"
+        }
+      }
+    },
+    "extraction_quality": {
+      "type": "object",
+      "description": "Quality metrics for extraction",
+      "properties": {
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "pages_processed": {
+          "type": "integer"
+        },
+        "sections_identified": {
+          "type": "integer"
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}
