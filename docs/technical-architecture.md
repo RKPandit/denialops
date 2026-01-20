@@ -510,6 +510,122 @@ LLM outputs are non-deterministic and expensive. Instead:
 
 ---
 
+## Verified Mode: SBC Document Extraction
+
+### Overview
+
+**Verified Mode** enables plan-specific, citation-backed recommendations by extracting rules from the user's Summary of Benefits and Coverage (SBC) document.
+
+```
+Fast Mode (denial letter only):
+  "You should file an appeal within the deadline"
+
+Verified Mode (denial letter + SBC):
+  "You have 180 days to file an appeal [SBC p.8, Appeals]"
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Document Processing                           │
+│                                                                      │
+│  Denial Letter ─────► extract_case_facts() ───► CaseFacts           │
+│                                                                      │
+│  SBC Document ──────► extract_plan_rules() ───► PlanRules           │
+│                              │                      │                │
+│                              ▼                      ▼                │
+│                        ┌─────────────────────────────────┐          │
+│                        │ generate_action_plan()          │          │
+│                        │   + generate_document_pack()    │          │
+│                        │                                 │          │
+│                        │ Combines facts + rules          │          │
+│                        │ Adds source citations           │          │
+│                        └─────────────────────────────────┘          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### PlanRules Model
+
+```python
+# src/denialops/models/plan_rules.py
+
+class PlanRules(BaseModel):
+    """Extracted rules from SBC/EOC documents."""
+
+    case_id: str
+    source_document: str
+    document_type: PlanDocumentType  # SBC, EOC, COC, SPD
+
+    # Plan identification
+    plan_info: PlanInfo
+
+    # Cost sharing
+    deductibles: Deductibles | None = None
+    out_of_pocket_max: OutOfPocketMax | None = None
+
+    # Coverage rules (with source citations)
+    prior_authorization_rules: list[PriorAuthRule] = []
+    medical_necessity_criteria: list[MedicalNecessityCriteria] = []
+    exclusions: list[Exclusion] = []
+
+    # Appeal process
+    appeal_rights: AppealRights | None = None
+
+    # Quality tracking
+    extraction_quality: ExtractionQuality
+```
+
+### Source Citations
+
+Every extracted rule includes its source for grounding:
+
+```python
+class SourceCitation(BaseModel):
+    source_page: int | None
+    source_section: str | None
+    source_quote: str | None
+
+    def format_citation(self) -> str:
+        """[SBC p.8, Appeals]"""
+        parts = []
+        if self.source_page:
+            parts.append(f"p.{self.source_page}")
+        if self.source_section:
+            parts.append(self.source_section)
+        return f"[SBC {', '.join(parts)}]" if parts else ""
+
+# Usage
+rule = plan_rules.appeal_rights
+citation = rule.get_citation().format_citation()
+message = f"You have {rule.internal_appeal_deadline_days} days {citation}"
+# "You have 180 days [SBC p.8, Appeals]"
+```
+
+### Two-Tier Extraction Strategy
+
+```python
+def extract_plan_rules(case_id, text, llm_api_key="", ...):
+    """Extract with LLM if available, else heuristics."""
+
+    if llm_api_key:
+        try:
+            return _extract_with_llm(...)  # Confidence: 0.5-0.9
+        except Exception as e:
+            logger.warning(f"LLM failed: {e}")
+
+    return _extract_with_heuristics(...)  # Confidence: 0.4
+```
+
+### Why Citations Matter
+
+1. **Trust**: Users can verify AI recommendations against source documents
+2. **Compliance**: Healthcare advice must be traceable
+3. **Debugging**: Easy to identify extraction errors
+4. **Legal protection**: Clear provenance for generated guidance
+
+---
+
 ## Production Considerations
 
 ### What's Needed for Production
@@ -637,8 +753,15 @@ For most extraction tasks:
 | File | Purpose |
 |------|---------|
 | `src/denialops/pipeline/extract_facts.py` | LLM extraction + fallback |
+| `src/denialops/pipeline/extract_plan_rules.py` | SBC/EOC extraction (Verified Mode) |
 | `src/denialops/pipeline/router.py` | Rule-based classification |
-| `src/denialops/llm/client.py` | Multi-provider abstraction |
+| `src/denialops/pipeline/generate_plan.py` | Action plan generation with citations |
+| `src/denialops/pipeline/generate_docs.py` | Document generation with policy citations |
+| `src/denialops/llm/client.py` | Multi-provider abstraction + retry logic |
+| `src/denialops/llm/prompts.py` | Centralized prompt templates |
 | `src/denialops/models/case.py` | Core data models |
+| `src/denialops/models/plan_rules.py` | PlanRules + SourceCitation models |
 | `src/denialops/api/routes.py` | Pipeline orchestration |
 | `schemas/*.json` | External contracts |
+| `docs/phase-2-learnings.md` | Production LLM patterns |
+| `docs/phase-3-learnings.md` | Verified Mode and source citations |

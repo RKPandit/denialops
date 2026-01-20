@@ -12,9 +12,20 @@ from denialops.models.case import (
     ServiceInfo,
 )
 from denialops.models.documents import DocumentType, UploadedDocument
+from denialops.models.plan_rules import (
+    AppealRights,
+    Exclusion,
+    MedicalNecessityCriteria,
+    PlanDocumentType,
+    PlanInfo,
+    PlanRules,
+    PriorAuthRule,
+    SourceCitation,
+)
 from denialops.models.route import RouteDecision, RouteSignal, RouteType
 
 __all__ = [
+    # Case models
     "CaseFacts",
     "CaseMode",
     "ContactInfo",
@@ -23,11 +34,23 @@ __all__ = [
     "MissingInfo",
     "PayerInfo",
     "ServiceInfo",
+    # Document models
     "DocumentType",
     "UploadedDocument",
+    # Plan rules models (Verified mode)
+    "AppealRights",
+    "Exclusion",
+    "MedicalNecessityCriteria",
+    "PlanDocumentType",
+    "PlanInfo",
+    "PlanRules",
+    "PriorAuthRule",
+    "SourceCitation",
+    # Route models
     "RouteDecision",
     "RouteSignal",
     "RouteType",
+    # Action plan models
     "ActionPlan",
     "ActionStep",
     "EvidenceItem",

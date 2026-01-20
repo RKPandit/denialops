@@ -13,6 +13,7 @@ from denialops.models.documents import ArtifactInfo, DocumentType
 from denialops.models.route import RouteType
 from denialops.pipeline import (
     extract_case_facts,
+    extract_plan_rules,
     extract_text,
     generate_action_plan,
     generate_document_pack,
@@ -200,6 +201,26 @@ async def run_pipeline(
         )
         storage.store_artifact(case_id, "case_facts.json", facts.model_dump(mode="json"))
 
+        # Stage 2b: Extract plan rules from SBC/EOC if uploaded (Verified mode)
+        plan_rules = None
+        sbc_doc = next(
+            (d for d in documents if d.get("doc_type") in ("sbc", "eoc")),
+            None,
+        )
+        if sbc_doc:
+            sbc_path = storage.get_document_path(case_id, sbc_doc["document_id"])
+            sbc_extracted = extract_text(sbc_path)
+            plan_rules = extract_plan_rules(
+                case_id=case_id,
+                text=sbc_extracted,
+                llm_api_key=settings.llm_api_key,
+                llm_model=settings.llm_model,
+                llm_provider=settings.llm_provider.value,
+            )
+            storage.store_artifact(
+                case_id, "plan_rules.json", plan_rules.model_dump(mode="json")
+            )
+
         # Stage 3: Route case
         route_decision = route_case(facts)
         storage.store_artifact(case_id, "route.json", route_decision.model_dump(mode="json"))
@@ -209,11 +230,14 @@ async def run_pipeline(
             facts=facts,
             route=route_decision,
             mode=_mode.value,
+            plan_rules=plan_rules,
         )
         storage.store_artifact(case_id, "action_plan.json", action_plan.model_dump(mode="json"))
 
         # Stage 5: Generate document pack
-        documents = generate_document_pack(facts=facts, plan=action_plan)
+        documents = generate_document_pack(
+            facts=facts, plan=action_plan, plan_rules=plan_rules
+        )
         for filename, content in documents.items():
             storage.store_artifact(case_id, filename, content)
 

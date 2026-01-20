@@ -503,9 +503,184 @@ def test_create_case(client):
 
 ---
 
-## Phase 5: Production Readiness
+## Phase 5: Production LLM Patterns
 
-### 5.1 Read the Technical Architecture
+### 5.1 Retry Logic with Exponential Backoff
+**File:** `src/denialops/llm/client.py`
+**Documentation:** `docs/phase-2-learnings.md`
+
+**What to Learn:**
+- Retry logic with exponential backoff
+- Handling rate limits and transient failures
+- Token usage tracking and cost estimation
+- Latency monitoring
+
+**Key Pattern - Exponential Backoff:**
+```python
+class RetryConfig:
+    def get_delay(self, attempt: int) -> float:
+        """Calculate delay: 1s, 2s, 4s, 8s... up to max_delay."""
+        delay = self.initial_delay * (self.exponential_base ** attempt)
+        return min(delay, self.max_delay)
+
+@retry_with_backoff(RetryConfig(max_retries=3))
+def make_api_call():
+    return client.chat.completions.create(...)
+```
+
+**Why This Matters:** LLM APIs fail frequently (rate limits, timeouts). Production systems must handle failures gracefully.
+
+**Exercise:** Add jitter (random variation) to the backoff delay to prevent thundering herd.
+
+---
+
+### 5.2 Token Usage Tracking
+**File:** `src/denialops/llm/client.py`
+
+**What to Learn:**
+- Tracking input/output tokens per call
+- Cost estimation by model
+- Aggregate usage across sessions
+
+**Key Pattern:**
+```python
+@dataclass
+class TokenUsage:
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+    @property
+    def estimated_cost(self) -> float:
+        pricing = {"gpt-4o": {"input": 5.0, "output": 15.0}}
+        input_cost = (self.prompt_tokens / 1_000_000) * pricing[model]["input"]
+        output_cost = (self.completion_tokens / 1_000_000) * pricing[model]["output"]
+        return input_cost + output_cost
+```
+
+**Exercise:** Add a budget alert that warns when costs exceed a threshold.
+
+---
+
+### 5.3 Prompt Template Organization
+**File:** `src/denialops/llm/prompts.py`
+
+**What to Learn:**
+- Centralized prompt management
+- Version-controlled prompts
+- Prompt validation
+
+**Key Pattern:**
+```python
+class PromptLibrary:
+    EXTRACT_FACTS_SYSTEM = EXTRACT_FACTS_SYSTEM
+    EXTRACT_FACTS_USER = EXTRACT_FACTS_USER
+
+    @classmethod
+    def validate_prompt(cls, prompt: str, required_vars: list[str]) -> bool:
+        return all(f"{{{var}}}" in prompt for var in required_vars)
+```
+
+**Exercise:** Add a prompt versioning system that tracks prompt changes over time.
+
+---
+
+## Phase 6: Verified Mode with Source Citations
+
+### 6.1 SBC Document Extraction
+**Files:** `src/denialops/models/plan_rules.py`, `src/denialops/pipeline/extract_plan_rules.py`
+**Documentation:** `docs/phase-3-learnings.md`
+
+**What to Learn:**
+- Extracting structured data from policy documents
+- Heuristic fallback when LLM unavailable
+- Tracking extraction quality/confidence
+
+**Key Pattern - Two-Tier Extraction:**
+```python
+def extract_plan_rules(case_id, text, llm_api_key=""):
+    if llm_api_key:
+        try:
+            return _extract_with_llm(...)
+        except Exception:
+            logger.warning("LLM failed, using heuristics")
+
+    return _extract_with_heuristics(...)  # Fallback
+```
+
+**Exercise:** Add extraction for a new section (e.g., "Network Requirements").
+
+---
+
+### 6.2 Source Citations for Grounding
+**File:** `src/denialops/models/plan_rules.py`
+
+**What to Learn:**
+- Citing sources for LLM-extracted information
+- Preventing hallucination through grounding
+- Building trust in AI recommendations
+
+**Key Pattern:**
+```python
+class SourceCitation(BaseModel):
+    source_page: int | None
+    source_section: str | None
+    source_quote: str | None
+
+    def format_citation(self) -> str:
+        parts = []
+        if self.source_page:
+            parts.append(f"p.{self.source_page}")
+        return f"[SBC {', '.join(parts)}]" if parts else ""
+
+# Usage in recommendations:
+recommendation = f"You have {deadline_days} days to appeal {citation.format_citation()}"
+# Output: "You have 180 days to appeal [SBC p.8, Appeals]"
+```
+
+**Why This Matters:** In healthcare/legal domains, recommendations must be traceable to source documents. Citations build trust and enable verification.
+
+**Exercise:** Add validation that checks if citations reference actual page numbers in the document.
+
+---
+
+### 6.3 Progressive Enhancement
+**File:** `src/denialops/pipeline/generate_plan.py`
+
+**What to Learn:**
+- Providing value at different input levels
+- Handling missing optional data gracefully
+- Mode-specific recommendations
+
+**Pattern:**
+```
+User uploads denial letter only
+    └─► Fast Mode: Generic guidance
+
+User uploads denial letter + SBC
+    └─► Verified Mode: Cited, plan-specific guidance
+```
+
+**Key Pattern:**
+```python
+def _identify_assumptions(facts, mode, plan_rules=None):
+    if mode == "fast" and not plan_rules:
+        assumptions.append(Assumption(
+            assumption="Plan-specific details not verified",
+            how_to_verify="Upload your SBC for verified guidance",
+        ))
+    elif plan_rules and plan_rules.extraction_quality.confidence < 0.7:
+        assumptions.append(Assumption(
+            assumption="Plan rules extracted with moderate confidence",
+        ))
+```
+
+**Exercise:** Add a "Premium Mode" that combines SBC with external policy databases.
+
+---
+
+## Phase 7: Production Readiness
+
+### 7.1 Read the Technical Architecture
 **File:** `docs/technical-architecture.md`
 
 Read the entire document, focusing on:
@@ -513,7 +688,7 @@ Read the entire document, focusing on:
 - Cost Optimization
 - Scaling Considerations
 
-### 5.2 What's Missing for Production
+### 7.2 What's Missing for Production
 
 | Component | Current | Production |
 |-----------|---------|------------|
@@ -523,7 +698,6 @@ Read the entire document, focusing on:
 | Monitoring | None | Prometheus/Grafana |
 | Logging | Basic | Structured (JSON) |
 | Rate Limiting | None | Per-user limits |
-| Retry Logic | None | Exponential backoff |
 
 **Exercise:** Implement a simple in-memory cache for LLM responses.
 
@@ -538,14 +712,14 @@ Read the entire document, focusing on:
 
 ### Intermediate
 4. [ ] Add a new route type (e.g., "timely_filing_issue")
-5. [ ] Implement retry logic for LLM calls with exponential backoff
+5. [ ] Add a new extraction field to `PlanRules` (e.g., "copay_rules")
 6. [ ] Add request logging middleware
 
 ### Advanced
-7. [ ] Replace file storage with SQLite
-8. [ ] Add streaming support for LLM responses
+7. [ ] Add jitter to retry backoff to prevent thundering herd
+8. [ ] Implement grounding validation (check generated content against source facts)
 9. [ ] Implement A/B testing between OpenAI and Anthropic
-10. [ ] Add OpenTelemetry tracing
+10. [ ] Add OpenTelemetry tracing for LLM calls
 
 ---
 
@@ -559,12 +733,21 @@ After studying this codebase, you should understand:
 - [ ] Structured output extraction
 - [ ] Error handling and fallbacks
 - [ ] Cost optimization strategies
+- [ ] Retry logic with exponential backoff
+- [ ] Token tracking and cost estimation
 
 ### System Design
 - [ ] Pipeline architecture
 - [ ] Artifact storage patterns
 - [ ] Configuration management
 - [ ] Dependency injection
+- [ ] Progressive enhancement (Fast → Verified modes)
+
+### Grounding & Trust
+- [ ] Source citations for LLM outputs
+- [ ] Heuristic fallbacks when LLM unavailable
+- [ ] Extraction quality tracking
+- [ ] Preventing hallucination
 
 ### Production Readiness
 - [ ] Testing strategies for AI systems

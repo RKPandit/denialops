@@ -4,15 +4,22 @@ from datetime import date
 
 from denialops.models.action_plan import ActionPlan
 from denialops.models.case import CaseFacts
+from denialops.models.plan_rules import PlanRules
 from denialops.models.route import RouteType
 
 
 def generate_document_pack(
     facts: CaseFacts,
     plan: ActionPlan,
+    plan_rules: PlanRules | None = None,
 ) -> dict[str, str]:
     """
     Generate all documents for an action plan.
+
+    Args:
+        facts: Extracted case facts
+        plan: Generated action plan
+        plan_rules: Optional PlanRules from SBC (for verified mode with citations)
 
     Returns a dict mapping filename to content.
     """
@@ -23,13 +30,13 @@ def generate_document_pack(
 
     # Route-specific documents
     if plan.route == RouteType.PRIOR_AUTH_NEEDED:
-        documents["pa_checklist.md"] = _generate_pa_checklist(facts, plan)
+        documents["pa_checklist.md"] = _generate_pa_checklist(facts, plan, plan_rules)
 
     elif plan.route == RouteType.CLAIM_CORRECTION_RESUBMIT:
         documents["resubmit_checklist.md"] = _generate_resubmit_checklist(facts, plan)
 
     elif plan.route == RouteType.MEDICAL_NECESSITY_APPEAL:
-        documents["appeal_letter.md"] = _generate_appeal_letter(facts, plan)
+        documents["appeal_letter.md"] = _generate_appeal_letter(facts, plan, plan_rules)
 
     return documents
 
@@ -112,12 +119,31 @@ def _generate_call_script(facts: CaseFacts, plan: ActionPlan) -> str:
     return script
 
 
-def _generate_pa_checklist(facts: CaseFacts, plan: ActionPlan) -> str:
+def _generate_pa_checklist(
+    facts: CaseFacts, plan: ActionPlan, plan_rules: PlanRules | None = None
+) -> str:
     """Generate prior authorization checklist."""
-    checklist = """# Prior Authorization Checklist
+    # Build overview with plan-specific citations if available
+    overview = (
+        "Your claim was denied because prior authorization was not obtained. "
+        "Follow this checklist to get authorization and request reconsideration."
+    )
+
+    if plan_rules and plan_rules.prior_authorization_rules:
+        # Find relevant PA rule
+        service_desc = (
+            facts.service.description if facts.service and facts.service.description else ""
+        )
+        pa_rule = plan_rules.get_pa_rule_for_service(service_desc)
+        if pa_rule:
+            citation = pa_rule.get_citation().format_citation()
+            if pa_rule.conditions:
+                overview += f"\n\n**Plan Policy:** {pa_rule.conditions} {citation}"
+
+    checklist = f"""# Prior Authorization Checklist
 
 ## Overview
-Your claim was denied because prior authorization was not obtained. Follow this checklist to get authorization and request reconsideration.
+{overview}
 
 ## Step 1: Contact Your Provider
 - [ ] Call your healthcare provider's office
@@ -257,7 +283,9 @@ Status: _________________________
     return checklist
 
 
-def _generate_appeal_letter(facts: CaseFacts, plan: ActionPlan) -> str:
+def _generate_appeal_letter(
+    facts: CaseFacts, plan: ActionPlan, plan_rules: PlanRules | None = None
+) -> str:
     """Generate appeal letter template."""
     today = date.today().strftime("%B %d, %Y")
     payer_name = facts.payer.name if facts.payer else "[Insurance Company Name]"
@@ -278,6 +306,39 @@ def _generate_appeal_letter(facts: CaseFacts, plan: ActionPlan) -> str:
         if facts.dates and facts.dates.date_of_denial
         else "[Denial Date]"
     )
+
+    # Build policy citations section if plan rules available
+    policy_citations = ""
+    if plan_rules:
+        citations_parts = []
+
+        # Add appeal rights citation
+        if plan_rules.appeal_rights:
+            ar = plan_rules.appeal_rights
+            if ar.internal_appeal_deadline_days:
+                citation = ar.get_citation().format_citation()
+                citations_parts.append(
+                    f"- You have {ar.internal_appeal_deadline_days} days to file an appeal {citation}"
+                )
+            if ar.expedited_appeal_available and ar.expedited_criteria:
+                citations_parts.append(
+                    f"- Expedited appeal available when: {ar.expedited_criteria}"
+                )
+
+        # Add medical necessity criteria citation
+        if plan_rules.medical_necessity_criteria:
+            mn = plan_rules.medical_necessity_criteria[0]
+            if mn.definition:
+                citation = mn.get_citation().format_citation()
+                citations_parts.append(
+                    f"- Plan defines medical necessity as: \"{mn.definition}\" {citation}"
+                )
+
+        if citations_parts:
+            policy_citations = """
+**Your Plan's Appeal Rights** (from your Summary of Benefits and Coverage)
+
+""" + "\n".join(citations_parts) + "\n"
 
     letter = f"""# Appeal Letter Template
 
@@ -310,7 +371,7 @@ Dear Appeals Committee:
 I am writing to formally appeal the denial of coverage for {service} that I received on {dos}. I received the denial letter dated {denial_date}, which stated the reason for denial as:
 
 > {facts.denial_reason}
-
+{policy_citations}
 **Why I Am Appealing**
 
 I believe this denial should be overturned because [explain why you believe the service is medically necessary and should be covered. Be specific about your condition, symptoms, and why this treatment is needed].

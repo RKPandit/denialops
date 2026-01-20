@@ -18,6 +18,7 @@ from denialops.models.action_plan import (
     Timeline,
 )
 from denialops.models.case import CaseFacts
+from denialops.models.plan_rules import PlanRules
 from denialops.models.route import RouteDecision, RouteType
 
 
@@ -25,6 +26,7 @@ def generate_action_plan(
     facts: CaseFacts,
     route: RouteDecision,
     mode: str = "fast",
+    plan_rules: PlanRules | None = None,
 ) -> ActionPlan:
     """
     Generate an action plan based on case facts and route.
@@ -33,23 +35,25 @@ def generate_action_plan(
         facts: Extracted case facts
         route: Routing decision
         mode: Processing mode ('fast' or 'verified')
+        plan_rules: Optional PlanRules extracted from SBC (for verified mode)
 
     Returns:
         ActionPlan with steps, evidence checklist, and generated documents
     """
     # Generate route-specific plan
     if route.route == RouteType.PRIOR_AUTH_NEEDED:
-        return _generate_pa_plan(facts, route, mode)
+        return _generate_pa_plan(facts, route, mode, plan_rules)
     elif route.route == RouteType.CLAIM_CORRECTION_RESUBMIT:
-        return _generate_resubmit_plan(facts, route, mode)
+        return _generate_resubmit_plan(facts, route, mode, plan_rules)
     else:  # MEDICAL_NECESSITY_APPEAL
-        return _generate_appeal_plan(facts, route, mode)
+        return _generate_appeal_plan(facts, route, mode, plan_rules)
 
 
 def _generate_pa_plan(
     facts: CaseFacts,
     route: RouteDecision,
     mode: str,
+    plan_rules: PlanRules | None = None,
 ) -> ActionPlan:
     """Generate action plan for prior authorization route."""
     summary = ActionSummary(
@@ -146,7 +150,7 @@ def _generate_pa_plan(
     ]
 
     missing_info = _identify_missing_info_requests(facts)
-    assumptions = _identify_assumptions(facts, mode)
+    assumptions = _identify_assumptions(facts, mode, plan_rules)
 
     return ActionPlan(
         case_id=facts.case_id,
@@ -178,6 +182,7 @@ def _generate_resubmit_plan(
     facts: CaseFacts,
     route: RouteDecision,
     mode: str,
+    plan_rules: PlanRules | None = None,
 ) -> ActionPlan:
     """Generate action plan for claim correction/resubmission route."""
     summary = ActionSummary(
@@ -256,7 +261,7 @@ def _generate_resubmit_plan(
     ]
 
     missing_info = _identify_missing_info_requests(facts)
-    assumptions = _identify_assumptions(facts, mode)
+    assumptions = _identify_assumptions(facts, mode, plan_rules)
 
     return ActionPlan(
         case_id=facts.case_id,
@@ -288,23 +293,47 @@ def _generate_appeal_plan(
     facts: CaseFacts,
     route: RouteDecision,
     mode: str,
+    plan_rules: PlanRules | None = None,
 ) -> ActionPlan:
     """Generate action plan for medical necessity appeal route."""
+    # Build recommendation with plan-specific citations if available
+    recommendation = (
+        "You should file a formal appeal with supporting clinical documentation "
+        "that demonstrates the medical necessity of the service."
+    )
+    success_factors = [
+        "Strong clinical documentation",
+        "Letter of medical necessity from provider",
+        "Appeal filed within deadline",
+        "Policy criteria addressed directly",
+    ]
+
+    # Enhance with plan rules if available (Verified mode)
+    if plan_rules:
+        # Add appeal deadline from plan rules
+        if plan_rules.appeal_rights and plan_rules.appeal_rights.internal_appeal_deadline_days:
+            deadline_days = plan_rules.appeal_rights.internal_appeal_deadline_days
+            citation = plan_rules.appeal_rights.get_citation().format_citation()
+            recommendation += (
+                f" Your plan allows {deadline_days} days to file an appeal. {citation}"
+            )
+
+        # Add medical necessity criteria if available
+        if plan_rules.medical_necessity_criteria:
+            criteria = plan_rules.medical_necessity_criteria[0]
+            if criteria.definition:
+                citation = criteria.get_citation().format_citation()
+                success_factors.append(
+                    f"Service meets plan's medical necessity definition {citation}"
+                )
+
     summary = ActionSummary(
         situation=(
             f"Your claim was denied based on medical necessity. Reason: {facts.denial_reason}"
         ),
-        recommendation=(
-            "You should file a formal appeal with supporting clinical documentation "
-            "that demonstrates the medical necessity of the service."
-        ),
+        recommendation=recommendation,
         success_likelihood=SuccessLikelihood.MEDIUM,
-        success_factors=[
-            "Strong clinical documentation",
-            "Letter of medical necessity from provider",
-            "Appeal filed within deadline",
-            "Policy criteria addressed directly",
-        ],
+        success_factors=success_factors,
     )
 
     steps = [
@@ -404,7 +433,7 @@ def _generate_appeal_plan(
     ]
 
     missing_info = _identify_missing_info_requests(facts)
-    assumptions = _identify_assumptions(facts, mode)
+    assumptions = _identify_assumptions(facts, mode, plan_rules)
 
     return ActionPlan(
         case_id=facts.case_id,
@@ -490,16 +519,27 @@ def _identify_missing_info_requests(facts: CaseFacts) -> list[MissingInfoRequest
     return requests
 
 
-def _identify_assumptions(facts: CaseFacts, mode: str) -> list[Assumption]:
+def _identify_assumptions(
+    facts: CaseFacts, mode: str, plan_rules: PlanRules | None = None
+) -> list[Assumption]:
     """Identify assumptions made due to missing information."""
     assumptions: list[Assumption] = []
 
-    if mode == "fast":
+    if mode == "fast" and not plan_rules:
         assumptions.append(
             Assumption(
                 assumption="Plan-specific coverage details not verified",
                 impact="Recommendations are general and may not reflect your specific plan rules",
                 how_to_verify="Upload your Summary of Benefits and Coverage (SBC) for verified guidance",
+            )
+        )
+    elif plan_rules and plan_rules.extraction_quality.confidence < 0.7:
+        # In verified mode with low confidence, note the extraction quality
+        assumptions.append(
+            Assumption(
+                assumption="Plan rules extracted with moderate confidence",
+                impact="Some plan details may need verification",
+                how_to_verify="Review your SBC document directly for exact policy language",
             )
         )
 
