@@ -678,9 +678,145 @@ def _identify_assumptions(facts, mode, plan_rules=None):
 
 ---
 
-## Phase 7: Production Readiness
+## Phase 7: Advanced LLM Features
 
-### 7.1 Read the Technical Architecture
+### 7.1 Personalized Summaries
+**Files:** `src/denialops/pipeline/llm_generation.py`
+**Documentation:** `docs/phase-4-learnings.md`
+
+**What to Learn:**
+- Generating user-friendly summaries from structured data
+- Graceful degradation (LLM → heuristics)
+- Combining multiple data sources for context
+
+**Key Pattern:**
+```python
+def generate_personalized_summary(facts, route, plan_rules=None, llm_api_key=""):
+    if llm_api_key:
+        try:
+            return _generate_with_llm(...)
+        except Exception:
+            pass
+    return _generate_with_heuristics(...)
+
+def _generate_with_heuristics(facts, route, plan_rules):
+    # Always works, even without LLM
+    return PersonalizedSummary(
+        situation_summary=f"Your claim was denied: {facts.denial_reason}",
+        recommendation=_get_route_recommendation(route),
+        is_llm_generated=False,
+    )
+```
+
+**Exercise:** Add urgency levels based on days until appeal deadline.
+
+---
+
+### 7.2 Grounding Validation
+**File:** `src/denialops/pipeline/llm_generation.py`
+
+**What to Learn:**
+- Detecting hallucinations in generated content
+- Validating claims against source facts
+- Building trust in AI-generated output
+
+**Key Pattern:**
+```python
+def validate_grounding(content, facts, plan_rules=None):
+    # Extract claims from generated content
+    found_codes = extract_codes_from_content(content)
+    found_dates = extract_dates_from_content(content)
+
+    # Build set of known valid values
+    known_codes = set(c.code for c in facts.denial_codes)
+    known_dates = collect_dates_from_facts(facts)
+
+    # Detect hallucinations
+    hallucinated_codes = [c for c in found_codes if c not in known_codes]
+
+    return GroundingResult(
+        is_grounded=len(hallucinated_codes) == 0,
+        hallucinated_codes=hallucinated_codes,
+    )
+```
+
+**Why This Matters:** LLMs can generate plausible-sounding but incorrect information. Grounding validation catches made-up codes, dates, and amounts before they reach users.
+
+**Exercise:** Add validation for monetary amounts.
+
+---
+
+### 7.3 Success Prediction
+**File:** `src/denialops/pipeline/llm_generation.py`
+
+**What to Learn:**
+- Multi-factor scoring for predictions
+- Explainable AI (factors for/against)
+- Combining heuristics with LLM reasoning
+
+**Key Pattern:**
+```python
+def _predict_with_heuristics(facts, route, plan_rules):
+    score = 0.5  # Start at 50%
+    factors_for, factors_against = [], []
+
+    # Route-specific factors
+    if route.route == RouteType.CLAIM_CORRECTION_RESUBMIT:
+        factors_for.append("Coding errors are often correctable")
+        score += 0.2
+
+    # Deadline factor
+    if facts.dates.appeal_deadline:
+        days_left = (deadline - date.today()).days
+        if days_left > 30:
+            factors_for.append("Sufficient time remaining")
+            score += 0.1
+
+    return SuccessPrediction(
+        likelihood="high" if score >= 0.7 else "medium",
+        score=score,
+        factors_for=factors_for,
+        factors_against=factors_against,
+    )
+```
+
+**Exercise:** Add a factor for "similar past appeals" from a database.
+
+---
+
+### 7.4 Multi-Document Support (EOB)
+**Files:** `src/denialops/models/eob.py`, `src/denialops/pipeline/extract_eob.py`
+
+**What to Learn:**
+- Extracting financial data from EOB documents
+- Enriching case facts from multiple sources
+- Pattern matching for healthcare documents
+
+**Key Pattern - Information Fusion:**
+```python
+# In pipeline:
+
+# Extract from denial letter
+facts = extract_case_facts(denial_text)
+
+# Extract from SBC (if uploaded)
+plan_rules = extract_plan_rules(sbc_text) if sbc_doc else None
+
+# Extract from EOB (if uploaded)
+eob_facts = extract_eob_facts(eob_text) if eob_doc else None
+
+# Enrich facts with EOB information
+if eob_facts and eob_facts.denial_codes and not facts.denial_codes:
+    facts.denial_codes = eob_facts.denial_codes
+```
+
+**Exercise:** Add extraction for a new document type (e.g., medical records).
+
+---
+
+## Phase 8: Production Readiness
+
+### 8.1 Read the Technical Architecture
 **File:** `docs/technical-architecture.md`
 
 Read the entire document, focusing on:
@@ -688,7 +824,7 @@ Read the entire document, focusing on:
 - Cost Optimization
 - Scaling Considerations
 
-### 7.2 What's Missing for Production
+### 8.2 What's Missing for Production
 
 | Component | Current | Production |
 |-----------|---------|------------|
