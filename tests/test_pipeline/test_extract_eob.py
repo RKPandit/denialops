@@ -13,7 +13,6 @@ from denialops.pipeline.extract_eob import (
     _extract_denial_info,
     _extract_member_costs,
     _extract_provider_info,
-    _extract_with_heuristics,
     extract_eob_facts,
 )
 

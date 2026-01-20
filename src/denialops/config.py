@@ -14,6 +14,14 @@ class LLMProvider(str, Enum):
     ANTHROPIC = "anthropic"
 
 
+class CacheBackendType(str, Enum):
+    """Supported cache backends."""
+
+    MEMORY = "memory"
+    REDIS = "redis"
+    NONE = "none"
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -43,6 +51,12 @@ class Settings(BaseSettings):
     # Limits
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
     artifact_retention_days: int = 7
+
+    # Cache
+    cache_backend: CacheBackendType = CacheBackendType.MEMORY
+    cache_ttl: int = 3600  # 1 hour
+    cache_max_size: int = 1000  # For memory cache
+    redis_url: str = "redis://localhost:6379"
 
     @property
     def is_dev(self) -> bool:

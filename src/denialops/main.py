@@ -7,7 +7,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from denialops import __version__
+from denialops.api.health import router as health_router
 from denialops.api.routes import router
+from denialops.api.streaming import router as streaming_router
+from denialops.api.tasks import router as tasks_router
 from denialops.config import get_settings
 
 
@@ -47,13 +50,10 @@ def create_app() -> FastAPI:
         )
 
     # Include routes
-    app.include_router(router, tags=["cases"])
-
-    # Health check
-    @app.get("/health")
-    async def health_check() -> dict[str, str]:
-        """Health check endpoint."""
-        return {"status": "healthy", "version": __version__}
+    app.include_router(health_router)
+    app.include_router(router, prefix="/api/v1", tags=["cases"])
+    app.include_router(streaming_router, prefix="/api/v1", tags=["streaming"])
+    app.include_router(tasks_router, prefix="/api/v1", tags=["tasks"])
 
     return app
 
