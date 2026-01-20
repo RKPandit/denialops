@@ -13,11 +13,15 @@ from denialops.models.documents import ArtifactInfo, DocumentType
 from denialops.models.route import RouteType
 from denialops.pipeline import (
     extract_case_facts,
+    extract_eob_facts,
     extract_plan_rules,
     extract_text,
     generate_action_plan,
     generate_document_pack,
+    generate_personalized_summary,
+    predict_success,
     route_case,
+    validate_grounding,
 )
 
 router = APIRouter()
@@ -52,12 +56,36 @@ class UploadDocumentResponse(BaseModel):
     stored_path: str = Field(..., description="Storage path")
 
 
+class SuccessPredictionResponse(BaseModel):
+    """Success prediction details."""
+
+    likelihood: str = Field(..., description="low, medium, or high")
+    score: float = Field(..., description="0.0 to 1.0")
+    factors_for: list[str] = Field(default_factory=list)
+    factors_against: list[str] = Field(default_factory=list)
+
+
+class GroundingValidationResponse(BaseModel):
+    """Grounding validation details."""
+
+    is_grounded: bool = Field(..., description="Whether content is grounded")
+    hallucinated_codes: list[str] = Field(default_factory=list)
+    hallucinated_dates: list[str] = Field(default_factory=list)
+    confidence: float = Field(0.5)
+
+
 class RunPipelineResponse(BaseModel):
     """Response from running the pipeline."""
 
     status: str = Field(..., description="Pipeline status")
     route: RouteType | None = Field(None, description="Selected route")
     confidence: float | None = Field(None, description="Routing confidence")
+    success_prediction: SuccessPredictionResponse | None = Field(
+        None, description="Predicted success likelihood"
+    )
+    grounding_validation: GroundingValidationResponse | None = Field(
+        None, description="Grounding validation results"
+    )
     artifacts: list[str] = Field(default_factory=list, description="Generated artifacts")
     error: str | None = Field(None, description="Error message if failed")
 
@@ -221,6 +249,39 @@ async def run_pipeline(
                 case_id, "plan_rules.json", plan_rules.model_dump(mode="json")
             )
 
+        # Stage 2c: Extract EOB facts if uploaded (Multi-document support - Phase 4)
+        eob_facts = None
+        eob_doc = next(
+            (d for d in documents if d.get("doc_type") == "eob"),
+            None,
+        )
+        if eob_doc:
+            eob_path = storage.get_document_path(case_id, eob_doc["document_id"])
+            eob_extracted = extract_text(eob_path)
+            eob_facts = extract_eob_facts(
+                case_id=case_id,
+                text=eob_extracted,
+                llm_api_key=settings.llm_api_key,
+                llm_model=settings.llm_model,
+                llm_provider=settings.llm_provider.value,
+            )
+            storage.store_artifact(
+                case_id, "eob_facts.json", eob_facts.model_dump(mode="json")
+            )
+
+            # Enrich case facts with EOB information
+            if eob_facts.denial_codes and not facts.denial_codes:
+                facts.denial_codes = [
+                    {"code": code, "description": "From EOB"}
+                    for code in eob_facts.denial_codes
+                ]
+            if (
+                eob_facts.appeal_deadline
+                and facts.dates
+                and not facts.dates.appeal_deadline
+            ):
+                facts.dates.appeal_deadline = eob_facts.appeal_deadline
+
         # Stage 3: Route case
         route_decision = route_case(facts)
         storage.store_artifact(case_id, "route.json", route_decision.model_dump(mode="json"))
@@ -241,6 +302,73 @@ async def run_pipeline(
         for filename, content in documents.items():
             storage.store_artifact(case_id, filename, content)
 
+        # Stage 6: Generate personalized summary (Phase 4)
+        personalized = generate_personalized_summary(
+            facts=facts,
+            route=route_decision,
+            plan_rules=plan_rules,
+            llm_api_key=settings.llm_api_key,
+            llm_model=settings.llm_model,
+            llm_provider=settings.llm_provider.value,
+        )
+        storage.store_artifact(
+            case_id,
+            "personalized_summary.json",
+            {
+                "situation_summary": personalized.situation_summary,
+                "recommendation": personalized.recommendation,
+                "key_points": personalized.key_points,
+                "urgency": personalized.urgency,
+                "success_factors": personalized.success_factors,
+                "is_llm_generated": personalized.is_llm_generated,
+            },
+        )
+
+        # Stage 7: Predict success likelihood (Phase 4)
+        success = predict_success(
+            facts=facts,
+            route=route_decision,
+            plan_rules=plan_rules,
+            llm_api_key=settings.llm_api_key,
+            llm_model=settings.llm_model,
+            llm_provider=settings.llm_provider.value,
+        )
+        storage.store_artifact(
+            case_id,
+            "success_prediction.json",
+            {
+                "likelihood": success.likelihood,
+                "score": success.score,
+                "factors_for": success.factors_for,
+                "factors_against": success.factors_against,
+                "reasoning": success.reasoning,
+            },
+        )
+
+        # Stage 8: Validate grounding of generated content (Phase 4)
+        # Validate the appeal letter if it was generated
+        appeal_letter = documents.get("appeal_letter.md", "")
+        grounding = validate_grounding(
+            content=appeal_letter,
+            facts=facts,
+            plan_rules=plan_rules,
+            llm_api_key=settings.llm_api_key,
+            llm_model=settings.llm_model,
+            llm_provider=settings.llm_provider.value,
+        )
+        storage.store_artifact(
+            case_id,
+            "grounding_validation.json",
+            {
+                "is_grounded": grounding.is_grounded,
+                "ungrounded_claims": grounding.ungrounded_claims,
+                "hallucinated_codes": grounding.hallucinated_codes,
+                "hallucinated_dates": grounding.hallucinated_dates,
+                "hallucinated_amounts": grounding.hallucinated_amounts,
+                "confidence": grounding.confidence,
+            },
+        )
+
         # List generated artifacts
         artifacts = storage.list_artifacts(case_id)
         artifact_names = [a.name for a in artifacts]
@@ -249,6 +377,18 @@ async def run_pipeline(
             status="completed",
             route=route_decision.route,
             confidence=route_decision.confidence,
+            success_prediction=SuccessPredictionResponse(
+                likelihood=success.likelihood,
+                score=success.score,
+                factors_for=success.factors_for,
+                factors_against=success.factors_against,
+            ),
+            grounding_validation=GroundingValidationResponse(
+                is_grounded=grounding.is_grounded,
+                hallucinated_codes=grounding.hallucinated_codes,
+                hallucinated_dates=grounding.hallucinated_dates,
+                confidence=grounding.confidence,
+            ),
             artifacts=artifact_names,
         )
 

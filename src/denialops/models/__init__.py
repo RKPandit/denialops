@@ -12,6 +12,14 @@ from denialops.models.case import (
     ServiceInfo,
 )
 from denialops.models.documents import DocumentType, UploadedDocument
+from denialops.models.eob import (
+    AccumulatorInfo,
+    ClaimStatus,
+    EOBFacts,
+    MemberCostSummary,
+    ProviderInfo,
+    ServiceLine,
+)
 from denialops.models.plan_rules import (
     AppealRights,
     Exclusion,
@@ -37,6 +45,13 @@ __all__ = [
     # Document models
     "DocumentType",
     "UploadedDocument",
+    # EOB models
+    "AccumulatorInfo",
+    "ClaimStatus",
+    "EOBFacts",
+    "MemberCostSummary",
+    "ProviderInfo",
+    "ServiceLine",
     # Plan rules models (Verified mode)
     "AppealRights",
     "Exclusion",
